@@ -389,9 +389,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         });
 
         FdSource sendPidSource(sendPid.readSide.get());
-        auto ss = tokenizeString<std::vector<std::string>>(sendPidSource.readLine());
-        assert(ss.size() == 1);
-        pid = string2Int<pid_t>(ss[0]).value();
+        auto pidStr = trim(sendPidSource.readLine());
+        auto pidMay = string2Int<pid_t>(pidStr);
+        assert(pidMay);
+        pid = *pidMay;
         auto thisProcPath = procPath / std::to_string(static_cast<pid_t>(pid));
 
         if (usingUserNamespace) {
