@@ -20,6 +20,7 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/split.hh"
 #include "nix/util/util.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/registry.hh"
@@ -106,15 +107,28 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     bool isFlake,
     bool preserveRelativePaths)
 {
-    static std::regex pathFlakeRegex(R"(([^?#]*)(\?([^#]*))?(#(.*))?)", std::regex::ECMAScript);
+    // (([^?#]*)(\?([^#]*))?(#(.*))?)
+    //   - group(1): path
+    //   - group(3): query (without '?') iff '?' comes before '#'
+    //   - group(5): fragment (without '#')
 
-    std::smatch match;
-    auto succeeds = std::regex_match(url, match, pathFlakeRegex);
-    if (!succeeds)
-        throw Error("invalid flakeref '%s'", url);
-    auto path = match[1].str();
-    auto query = decodeQuery(match[3].str(), /*lenient=*/true);
-    auto fragment = percentDecode(match[5].str());
+    auto urlView = std::string_view{url};
+
+    auto [beforeHash, fragmentView] = [&] {
+        if (auto s = splitOnce(urlView, '#'))
+            return *s;
+        return std::pair{urlView, std::string_view{}};
+    }();
+
+    auto [pathView, queryView] = [&] {
+        if (auto s = splitOnce(beforeHash, '?'))
+            return *s;
+        return std::pair{beforeHash, std::string_view{}};
+    }();
+
+    auto path = std::string(pathView);
+    auto query = decodeQuery(queryView, /*lenient=*/true);
+    auto fragment = percentDecode(fragmentView);
 
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
