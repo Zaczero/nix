@@ -177,8 +177,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         Path globalTmpDir = canonPath(defaultTempDir().string(), true);
 
         /* They don't like trailing slashes on subpath directives */
-        while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
-            globalTmpDir.pop_back();
+        stripTrailing(globalTmpDir, '/');
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
