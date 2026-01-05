@@ -9,13 +9,22 @@
 #include "nix/store/globals.hh"
 #include "nix/util/variant-wrapper.hh"
 
+#include <algorithm>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <variant>
-#include <regex>
 #include <ranges>
 
 namespace nix {
+
+static bool isExportReferencesGraphFileName(std::string_view s)
+{
+    // [A-Za-z_][A-Za-z0-9_.-]*
+    auto isStart = [](char c) { return c == '_' || isAsciiAlpha(c); };
+    auto isContinue = [](char c) { return c == '_' || c == '.' || c == '-' || isAsciiAlpha(c) || isAsciiDigit(c); };
+    return !s.empty() && isStart(s.front()) && std::all_of(std::next(s.begin()), s.end(), isContinue);
+}
 
 static std::optional<std::string>
 getStringAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
@@ -70,10 +79,10 @@ getStringsAttr(const StringMap & env, const StructuredAttrs * parsed, const std:
                 throw Error("attribute '%s' must be a list of strings", name);
             auto & a = getArray(i->second);
             Strings res;
-            for (auto j = a.begin(); j != a.end(); ++j) {
-                if (!j->is_string())
+            for (const auto & j : a) {
+                if (!j.is_string())
                     throw Error("attribute '%s' must be a list of strings", name);
-                res.push_back(j->get<std::string>());
+                res.push_back(j.get<std::string>());
             }
             return res;
         }
@@ -247,10 +256,10 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                             [&](const std::string & name) -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {
                             if (auto i = get(output, name)) {
                                 std::set<DrvRef<SingleDerivedPath>> res;
-                                for (auto j = i->begin(); j != i->end(); ++j) {
-                                    if (!j->is_string())
+                                for (const auto & j : *i) {
+                                    if (!j.is_string())
                                         throw Error("attribute '%s' must be a list of strings", name);
-                                    res.insert(parseRef(j->get<std::string>()));
+                                    res.insert(parseRef(j.get<std::string>()));
                                 }
                                 return res;
                             }
@@ -362,8 +371,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                         throw Error("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
                     for (Strings::iterator i = ss.begin(); i != ss.end();) {
                         auto fileName = std::move(*i++);
-                        static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
-                        if (!std::regex_match(fileName, regex))
+                        if (!isExportReferencesGraphFileName(fileName))
                             throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
                         auto & storePathS = *i++;
