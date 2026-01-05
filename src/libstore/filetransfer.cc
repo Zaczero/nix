@@ -29,7 +29,7 @@
 #include <queue>
 #include <random>
 #include <thread>
-#include <regex>
+#include <boost/regex.hpp>
 
 namespace nix {
 
@@ -163,8 +163,8 @@ struct curlFileTransfer : public FileTransfer
                 appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
                 appendHeaders("Content-Type: " + request.mimeType);
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                appendHeaders(fmt("%s: %s", it->first, it->second));
+            for (const auto & header : request.headers) {
+                appendHeaders(fmt("%s: %s", header.first, header.second));
             }
         }
 
@@ -262,8 +262,10 @@ struct curlFileTransfer : public FileTransfer
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
 
-            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
-            if (std::smatch match; std::regex_match(line, match, statusLine)) {
+            static const auto statusLine = boost::regex(
+                "HTTP/[^ ]+ +[0-9]+(.*)", boost::regex_constants::icase | boost::regex_constants::optimize);
+            boost::smatch match;
+            if (boost::regex_match(line, match, statusLine)) {
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
@@ -299,10 +301,11 @@ struct curlFileTransfer : public FileTransfer
                         acceptRanges = true;
 
                     else if (name == "link" || name == "x-amz-meta-link") {
-                        auto value = trim(line.substr(i + 1));
-                        static std::regex linkRegex(
-                            "<([^>]*)>; rel=\"immutable\"", std::regex::extended | std::regex::icase);
-                        if (std::smatch match; std::regex_match(value, match, linkRegex))
+                        static const auto linkRegex = boost::regex(
+                            "<([^>]*)>; rel=\"immutable\"",
+                            boost::regex_constants::icase | boost::regex_constants::optimize);
+                        boost::smatch match;
+                        if (boost::regex_match(value, match, linkRegex))
                             result.immutableUrl = match.str(1);
                         else
                             debug("got invalid link header '%s'", value);
