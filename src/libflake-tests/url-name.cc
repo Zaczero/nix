@@ -19,6 +19,8 @@ TEST(getNameFromURL, getNameFromURL)
         getNameFromURL(parseURL("path:./nixpkgs#packages.x86_64-linux.complex^bin,man", /*lenient=*/true)), "complex");
     ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#packages.x86_64-linux.default^*", /*lenient=*/true)), "myproj");
     ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#defaultPackage.x86_64-linux")), "myproj");
+    ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#defaultPackage.x86_64-linux.hello")), "hello");
+    ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#defaultPackage.defaultPackage")), "myproj");
 
     ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
     ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#hello")), "hello");
@@ -27,6 +29,8 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nix")), "nix");
     ASSERT_EQ(getNameFromURL(parseURL("github:cachix/devenv/main#packages.x86_64-linux.default")), "devenv");
     ASSERT_EQ(getNameFromURL(parseURL("github:edolstra/nix-warez?rev=1234&dir=blender&ref=master")), "blender");
+    ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs/")), "nixpkgs");
+    ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs/main/")), "nixpkgs");
 
     ASSERT_EQ(getNameFromURL(parseURL("gitlab:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
     ASSERT_EQ(getNameFromURL(parseURL("gitlab:NixOS/nixpkgs#hello")), "hello");
@@ -84,5 +88,8 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("file:.#")), std::nullopt);
     ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default")), std::nullopt);
     ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default^*", /*lenient=*/true)), std::nullopt);
+
+    ASSERT_EQ(getNameFromURL(parseURL("path:/foo%2Fbar")), "bar");
+    ASSERT_EQ(getNameFromURL(parseURL("github:owner/repo%2Fextra")), "repo");
 }
 } // namespace nix
