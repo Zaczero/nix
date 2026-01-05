@@ -427,7 +427,7 @@ ParsedURL fixGitURL(std::string url)
     // Drop the superfluous "git+" from the scheme.
     auto scheme = parseUrlScheme(parsed.scheme);
     if (scheme.application == "git")
-        parsed.scheme = scheme.transport;
+        parsed.scheme = std::string{scheme.transport};
     return parsed;
 }
 

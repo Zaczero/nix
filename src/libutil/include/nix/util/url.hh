@@ -1,8 +1,10 @@
 #pragma once
 ///@file
 
+#include <concepts>
 #include <ranges>
 #include <span>
+#include <type_traits>
 
 #include "nix/util/error.hh"
 #include "nix/util/canon-path.hh"
@@ -329,6 +331,10 @@ struct ParsedUrlScheme
 };
 
 ParsedUrlScheme parseUrlScheme(std::string_view scheme);
+
+template<typename S>
+    requires std::same_as<std::remove_cvref_t<S>, std::string> && std::is_rvalue_reference_v<S &&>
+ParsedUrlScheme parseUrlScheme(S &&) = delete;
 
 /**
  * Detects scp-style uris (e.g. `git@github.com:NixOS/nix`) and fixes

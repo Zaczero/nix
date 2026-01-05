@@ -7,18 +7,20 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <string>
+
 namespace nix {
 
 class BadNixStringContextElem : public Error
 {
 public:
-    std::string_view raw;
+    std::string raw;
 
     template<typename... Args>
     BadNixStringContextElem(std::string_view raw_, const Args &... args)
         : Error("")
+        , raw(raw_)
     {
-        raw = raw_;
         auto hf = HintFmt(args...);
         err.msg = HintFmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }

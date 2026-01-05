@@ -1,6 +1,7 @@
 #include "nix/store/names.hh"
 #include "nix/util/util.hh"
 
+#include <cctype>
 #include <regex>
 
 namespace nix {
@@ -26,7 +27,7 @@ DrvName::DrvName(std::string_view s)
     name = fullName = std::string(s);
     for (unsigned int i = 0; i < s.size(); ++i) {
         /* !!! isalpha/isdigit are affected by the locale. */
-        if (s[i] == '-' && i + 1 < s.size() && !isalpha(s[i + 1])) {
+        if (s[i] == '-' && i + 1 < s.size() && !std::isalpha(static_cast<unsigned char>(s[i + 1]))) {
             name = s.substr(0, i);
             version = s.substr(i + 1);
             break;
@@ -64,11 +65,11 @@ std::string_view nextComponent(std::string_view::const_iterator & p, const std::
        of digits.  Otherwise, consume the longest sequence of
        non-digit, non-separator characters. */
     auto s = p;
-    if (isdigit(*p))
-        while (p != end && isdigit(*p))
+    if (std::isdigit(static_cast<unsigned char>(*p)))
+        while (p != end && std::isdigit(static_cast<unsigned char>(*p)))
             p++;
     else
-        while (p != end && (!isdigit(*p) && *p != '.' && *p != '-'))
+        while (p != end && (!std::isdigit(static_cast<unsigned char>(*p)) && *p != '.' && *p != '-'))
             p++;
 
     return {s, size_t(p - s)};

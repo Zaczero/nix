@@ -255,7 +255,7 @@ struct CurlInputScheme : InputScheme
 
         auto url = _url;
 
-        url.scheme = parseUrlScheme(url.scheme).transport;
+        url.scheme = std::string{parseUrlScheme(url.scheme).transport};
 
         auto narHash = url.query.find("narHash");
         if (narHash != url.query.end())
