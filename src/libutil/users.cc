@@ -2,6 +2,7 @@
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -86,11 +87,11 @@ std::filesystem::path createNixStateDir()
 std::string expandTilde(std::string_view path)
 {
     // TODO: expand ~user ?
-    auto tilde = path.substr(0, 2);
-    if (tilde == "~/" || tilde == "~")
+    if (path == "~")
+        return getHome().string();
+    if (path.starts_with("~/"))
         return getHome().string() + std::string(path.substr(1));
-    else
-        return std::string(path);
+    return std::string(path);
 }
 
 } // namespace nix

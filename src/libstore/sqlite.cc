@@ -73,7 +73,7 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
     try {
         auto shmFile = path;
         shmFile += "-shm";
-        AutoCloseFD fd = open(shmFile.string().c_str(), O_RDWR | O_CLOEXEC);
+        AutoCloseFD fd = open(shmFile.c_str(), O_RDWR | O_CLOEXEC);
         if (fd) {
             struct statfs fs;
             if (fstatfs(fd.get(), &fs))

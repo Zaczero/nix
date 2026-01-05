@@ -144,20 +144,21 @@ struct PathInputScheme : InputScheme
         Input input(_input);
         auto path = getStrAttr(input.attrs, "path");
 
-        auto absPath = getAbsPath(input);
+        auto absPathPath = getAbsPath(input);
+        auto absPath = absPathPath.string();
 
         // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store.maybeParseStorePath(absPath.string());
+        auto storePath = store.maybeParseStorePath(absPath);
 
         if (storePath)
             store.addTempRoot(*storePath);
 
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store.isValidPath(*storePath)) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPathPath));
             // FIXME: try to substitute storePath.
-            auto src = sinkToSource(
-                [&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter); });
+            auto src =
+                sinkToSource([&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter); });
             storePath = store.addToStoreFromDump(*src, "source");
         }
 

@@ -27,10 +27,10 @@ bool dryRun = false;
 
 void removeOldGenerations(std::filesystem::path dir)
 {
-    if (access(dir.string().c_str(), R_OK) != 0)
+    if (access(dir.c_str(), R_OK) != 0)
         return;
 
-    bool canWrite = access(dir.string().c_str(), W_OK) == 0;
+    bool canWrite = access(dir.c_str(), W_OK) == 0;
 
     for (auto & i : DirectoryIterator{dir}) {
         checkInterrupt();

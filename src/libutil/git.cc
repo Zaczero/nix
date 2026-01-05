@@ -94,11 +94,10 @@ void parseBlob(
 
     case BlobMode::Symlink: {
         std::string target;
-        target.resize(size, '0');
-        target.reserve(size);
+        target.resize(size);
         for (size_t n = 0; n < target.size();) {
             checkInterrupt();
-            n += source.read(const_cast<char *>(target.c_str()) + n, target.size() - n);
+            n += source.read(target.data() + n, target.size() - n);
         }
 
         sink.createSymlink(sinkPath, target);

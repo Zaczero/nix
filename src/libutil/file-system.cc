@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <ranges>
 
 #ifdef __FreeBSD__
 #  include <sys/param.h>
@@ -230,7 +231,7 @@ bool pathExists(const std::filesystem::path & path)
 bool pathAccessible(const std::filesystem::path & path)
 {
     try {
-        return pathExists(path.string());
+        return pathExists(path);
     } catch (SysError & e) {
         // swallow EPERM
         if (e.errNo == EPERM)
@@ -411,10 +412,10 @@ void recursiveSync(const Path & path)
     }
 
     /* Fsync all the directories. */
-    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
+    for (auto & dir : std::ranges::reverse_view(dirsToFsync)) {
+        AutoCloseFD fd = toDescriptor(open(dir.string().c_str(), O_RDONLY, 0));
         if (!fd)
-            throw SysError("opening directory '%1%'", *dir);
+            throw SysError("opening directory '%1%'", dir);
         fd.fsync();
     }
 }
@@ -581,10 +582,9 @@ AutoCloseFD createAnonymousTempFile()
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
     Path tmpl(defaultTempDir().string() + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
     // FIXME: Windows should use FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE
-    AutoCloseFD fd = toDescriptor(mkstemp((char *) tmpl.c_str()));
+    AutoCloseFD fd = toDescriptor(mkstemp(tmpl.data()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
 #ifndef _WIN32
@@ -664,7 +664,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         throw Error("file %s has an unsupported type", from);
     }
 
-    setWriteTime(to, lstat(from.string().c_str()));
+    setWriteTime(to, lstat(from.string()));
     if (andDelete) {
         if (!std::filesystem::is_symlink(fromStatus))
             std::filesystem::permissions(

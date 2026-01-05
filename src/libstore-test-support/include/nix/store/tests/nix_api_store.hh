@@ -52,7 +52,7 @@ protected:
         // because this is not allowed for a nix store.
         auto tmpl =
             nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", std::nullopt, true);
-        nixDir = mkdtemp((char *) tmpl.c_str());
+        nixDir = mkdtemp(tmpl.data());
 #endif
 
         nixStoreDir = nixDir + "/my_nix_store";

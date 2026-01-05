@@ -97,9 +97,9 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
-        std::filesystem::path fileName = tmpDir->path() / "host-key";
-        writeFile(fileName.string(), authority.host + " " + sshPublicHostKey + "\n");
-        args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
+        auto fileName = (tmpDir->path() / "host-key").string();
+        writeFile(fileName, authority.host + " " + sshPublicHostKey + "\n");
+        args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName});
     }
     if (compress)
         args.push_back("-C");
@@ -182,7 +182,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
             Strings args;
 
             if (!fakeSSH) {
-                args = {"ssh", hostnameAndUser.c_str(), "-x"};
+                args = {"ssh", hostnameAndUser, "-x"};
                 addCommonSSHOpts(args);
                 if (socketPath != "")
                     args.insert(args.end(), {"-S", socketPath});
@@ -260,7 +260,7 @@ Path SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
+            Strings args = {"ssh", hostnameAndUser, "-M", "-N", "-S", state->socketPath};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
             addCommonSSHOpts(args);

@@ -140,9 +140,10 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
     auto res = unresolved;
 
     auto builtContext = build(evalStore, store);
-    res.program = resolveString(*store, unresolved.program.string(), builtContext);
-    if (!store->isInStore(res.program.string()))
-        throw Error("app program '%s' is not in the Nix store", res.program.string());
+    auto program = resolveString(*store, unresolved.program.string(), builtContext);
+    if (!store->isInStore(program))
+        throw Error("app program '%s' is not in the Nix store", program);
+    res.program = std::move(program);
 
     return res;
 }

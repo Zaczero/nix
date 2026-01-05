@@ -21,10 +21,10 @@ void showManPage(const std::string & name)
         throw Error(
             "The '%1%' command was not found, but it is needed for '%2%' and some other '%3%' commands' help text. Perhaps you could install the '%1%' command?",
             "man",
-            name.c_str(),
+            name,
             "nix-*");
     }
-    throw SysError("command 'man %1%' failed", name.c_str());
+    throw SysError("command 'man %1%' failed", name);
 }
 
 } // namespace nix

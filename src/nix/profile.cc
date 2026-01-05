@@ -124,7 +124,7 @@ struct ProfileManifest
         auto manifestPath = profile / "manifest.json";
 
         if (std::filesystem::exists(manifestPath)) {
-            auto json = nlohmann::json::parse(readFile(manifestPath.string()));
+            auto json = nlohmann::json::parse(readFile(manifestPath));
 
             auto version = json.value("version", 0);
             std::string sUrl;
@@ -177,10 +177,11 @@ struct ProfileManifest
 
         else if (std::filesystem::exists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStorePath(profile.string()));
+            auto profileStr = profile.string();
+            state.allowPath(state.store->followLinksToStorePath(profileStr));
             state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
+            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profileStr));
 
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
@@ -234,7 +235,8 @@ struct ProfileManifest
 
     StorePath build(ref<Store> store)
     {
-        auto tempDir = createTempDir();
+        auto tempDirPath = createTempDir();
+        auto tempDir = tempDirPath.string();
 
         StorePathSet references;
 
@@ -247,13 +249,13 @@ struct ProfileManifest
             }
         }
 
-        buildProfile(tempDir.string(), std::move(pkgs));
+        buildProfile(tempDir, std::move(pkgs));
 
-        writeFile(tempDir / "manifest.json", toJSON(*store).dump());
+        writeFile(tempDirPath / "manifest.json", toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
         StringSink sink;
-        dumpPath(tempDir.string(), sink);
+        dumpPath(tempDir, sink);
 
         auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 

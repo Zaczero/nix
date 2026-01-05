@@ -371,17 +371,17 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     readProcLink(fmt("/proc/%s/exe", ent->d_name), unchecked);
                     readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
 
-                    auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                    auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
+                    auto fdDirPath = fmt("/proc/%s/fd", ent->d_name);
+                    auto fdDir = AutoCloseDir(opendir(fdDirPath.c_str()));
                     if (!fdDir) {
                         if (errno == ENOENT || errno == EACCES)
                             continue;
-                        throw SysError("opening %1%", fdStr);
+                        throw SysError("opening %1%", fdDirPath);
                     }
                     struct dirent * fd_ent;
                     while (errno = 0, fd_ent = readdir(fdDir.get())) {
                         if (fd_ent->d_name[0] != '.')
-                            readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
+                            readProcLink(fmt("%s/%s", fdDirPath, fd_ent->d_name), unchecked);
                     }
                     if (errno) {
                         if (errno == ESRCH)
@@ -390,12 +390,11 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     }
                     fdDir.reset();
 
-                    std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapFileStr = mapFile.string();
-                    for (auto line : tokenizeString(readFile(mapFileStr), "\n")) {
+                    auto mapFile = fmt("/proc/%s/maps", ent->d_name);
+                    for (auto line : tokenizeString(readFile(mapFile), "\n")) {
                         boost::match_results<std::string_view::const_iterator> match;
                         if (boost::regex_match(line.begin(), line.end(), match, mapRegex))
-                            unchecked[match[1].str()].emplace(mapFileStr);
+                            unchecked[match[1].str()].emplace(mapFile);
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);

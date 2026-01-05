@@ -1,7 +1,10 @@
 #include "nix/expr/eval-profiler.hh"
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/lru-cache.hh"
+
+#include <fcntl.h>
 
 namespace nix {
 
@@ -137,7 +140,7 @@ public:
         : state(state)
         , sampleInterval(period)
         , profileFd([&]() {
-            AutoCloseFD fd = toDescriptor(open(profileFile.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0660));
+            AutoCloseFD fd = toDescriptor(open(profileFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0660));
             if (!fd)
                 throw SysError("opening file %s", profileFile);
             return fd;
