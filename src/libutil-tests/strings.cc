@@ -170,6 +170,47 @@ TEST(dropEmptyInitThenConcatStringsSep, emptyStrings)
  * tokenizeString
  * --------------------------------------------------------------------------*/
 
+TEST(tokenizeStringView, empty)
+{
+    std::vector<std::string_view> tokens;
+    for (auto t : tokenizeString(""))
+        tokens.push_back(t);
+
+    EXPECT_TRUE(tokens.empty());
+}
+
+TEST(tokenizeStringView, defaults)
+{
+    std::string s = "foo bar\tbaz\nqux";
+    std::vector<std::string_view> tokens;
+    for (auto t : tokenizeString(s))
+        tokens.push_back(t);
+
+    std::vector<std::string_view> expected = {"foo", "bar", "baz", "qux"};
+    EXPECT_EQ(tokens, expected);
+}
+
+TEST(tokenizeStringView, customSep)
+{
+    std::string s = "foo,,bar,";
+    std::vector<std::string_view> tokens;
+    for (auto t : tokenizeString(s, ","))
+        tokens.push_back(t);
+
+    std::vector<std::string_view> expected = {"foo", "bar"};
+    EXPECT_EQ(tokens, expected);
+}
+
+TEST(tokenizeStringView, owningTemporary)
+{
+    std::vector<std::string_view> tokens;
+    for (auto t : tokenizeString(std::string{"foo bar baz"}))
+        tokens.push_back(t);
+
+    std::vector<std::string_view> expected = {"foo", "bar", "baz"};
+    EXPECT_EQ(tokens, expected);
+}
+
 TEST(tokenizeString, empty)
 {
     Strings expected = {};

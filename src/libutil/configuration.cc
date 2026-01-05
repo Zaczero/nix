@@ -5,9 +5,11 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/split.hh"
 
 #include "nix/util/config-impl.hh"
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
@@ -429,9 +431,9 @@ template<>
 StringMap BaseSetting<StringMap>::parse(const std::string & str) const
 {
     StringMap res;
-    for (const auto & s : tokenizeString<Strings>(str)) {
-        if (auto eq = s.find_first_of('='); s.npos != eq)
-            res.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
+    for (auto s : tokenizeString(str)) {
+        if (auto split = splitOnce(s, '='))
+            res.emplace(std::string(split->first), std::string(split->second));
         // else ignored
     }
     return res;
@@ -551,7 +553,7 @@ void OptionalPathSetting::operator=(const std::optional<Path> & v)
 bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
 {
     auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
+    return std::ranges::find(f, feature) != f.end();
 }
 
 void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const

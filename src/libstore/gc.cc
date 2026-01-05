@@ -391,11 +391,11 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     fdDir.reset();
 
                     std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile.string()), "\n");
-                    for (const auto & line : mapLines) {
-                        auto match = boost::smatch{};
-                        if (boost::regex_match(line, match, mapRegex))
-                            unchecked[match[1]].emplace(mapFile.string());
+                    auto mapFileStr = mapFile.string();
+                    for (auto line : tokenizeString(readFile(mapFileStr), "\n")) {
+                        boost::match_results<std::string_view::const_iterator> match;
+                        if (boost::regex_match(line.begin(), line.end(), match, mapRegex))
+                            unchecked[match[1].str()].emplace(mapFileStr);
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
@@ -422,12 +422,10 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     // Because of this we disable lsof when running the tests.
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
-            boost::regex lsofRegex(R"(^n(/.*)$)");
-            auto lsofLines =
-                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, {"-n", "-w", "-F", "n"}), "\n");
-            for (const auto & line : lsofLines) {
-                boost::smatch match;
-                if (boost::regex_match(line, match, lsofRegex))
+            static const auto lsofRegex = boost::regex(R"(^n(/.*)$)", boost::regex_constants::optimize);
+            for (auto line : tokenizeString(runProgram(LSOF, true, {"-n", "-w", "-F", "n"}), "\n")) {
+                boost::match_results<std::string_view::const_iterator> match;
+                if (boost::regex_match(line.begin(), line.end(), match, lsofRegex))
                     unchecked[match[1].str()].emplace("{lsof}");
             }
         } catch (ExecError & e) {

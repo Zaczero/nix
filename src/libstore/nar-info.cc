@@ -69,10 +69,9 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
                 throw corrupt("invalid NarSize");
             narSize = *n;
         } else if (name == "References") {
-            auto refs = tokenizeString<Strings>(value, " ");
             if (!references.empty())
                 throw corrupt("extra References");
-            for (auto & r : refs)
+            for (auto r : tokenizeString(value, " "))
                 references.insert(StorePath(r));
         } else if (name == "Deriver") {
             if (value != "unknown-deriver")

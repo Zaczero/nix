@@ -12,6 +12,7 @@
 #include <git2/errors.h>
 #include <git2/remote.h>
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 namespace nix::lfs {
@@ -144,7 +145,7 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
     std::string oid;
     std::string size;
 
-    for (auto & line : tokenizeString<Strings>(content, "\n")) {
+    for (auto line : tokenizeString(content, "\n")) {
         if (line.starts_with("version ")) {
             continue;
         }
@@ -160,12 +161,12 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
         debug("Custom extension '%s' found, ignoring", line);
     }
 
-    if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), [](unsigned char c) { return std::isxdigit(c); })) {
+    if (oid.length() != 64 || !std::ranges::all_of(oid, [](unsigned char c) { return std::isxdigit(c); })) {
         debug("Invalid sha256 %s, skipping", oid);
         return std::nullopt;
     }
 
-    if (size.empty() || !std::all_of(size.begin(), size.end(), [](unsigned char c) { return std::isdigit(c); })) {
+    if (size.empty() || !std::ranges::all_of(size, [](unsigned char c) { return std::isdigit(c); })) {
         debug("Invalid size %s, skipping", size);
         return std::nullopt;
     }

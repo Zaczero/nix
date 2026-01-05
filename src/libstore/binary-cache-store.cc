@@ -12,6 +12,7 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
 #include "nix/util/archive.hh"
 
 #include <chrono>
@@ -49,12 +50,12 @@ void BinaryCacheStore::init()
     if (!cacheInfo) {
         upsertFile(cacheInfoFile, "StoreDir: " + storeDir + "\n", "text/x-nix-cache-info");
     } else {
-        for (auto & line : tokenizeString<Strings>(*cacheInfo, "\n")) {
-            size_t colon = line.find(':');
-            if (colon == std::string::npos)
+        for (auto line : tokenizeString(*cacheInfo, "\n")) {
+            auto split = splitOnce(line, ':');
+            if (!split)
                 continue;
-            auto name = line.substr(0, colon);
-            auto value = trim(line.substr(colon + 1, std::string::npos));
+            auto name = split->first;
+            auto value = trim(split->second);
             if (name == "StoreDir") {
                 if (value != storeDir)
                     throw Error(

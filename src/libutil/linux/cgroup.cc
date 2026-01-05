@@ -1,5 +1,6 @@
 #include "nix/util/cgroup.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
@@ -56,7 +57,7 @@ CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
     auto cpustatPath = cgroup / "cpu.stat";
 
     if (pathExists(cpustatPath)) {
-        for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
+        for (auto line : tokenizeString(readFile(cpustatPath), "\n")) {
             std::string_view userPrefix = "user_usec ";
             if (line.starts_with(userPrefix)) {
                 auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
@@ -106,17 +107,17 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     boost::unordered_flat_set<pid_t> pidsShown;
 
     while (true) {
-        auto pids = tokenizeString<std::vector<std::string>>(readFile(procsFile));
-
-        if (pids.empty())
+        auto pids = tokenizeString(readFile(procsFile));
+        auto it = pids.begin();
+        if (it == pids.end())
             break;
 
         if (round > 20)
             throw Error("cannot kill cgroup '%s'", cgroup);
 
-        for (auto & pid_s : pids) {
+        for (; it != pids.end(); ++it) {
             pid_t pid;
-            if (auto o = string2Int<pid_t>(pid_s))
+            if (auto o = string2Int<pid_t>(*it))
                 pid = *o;
             else
                 throw Error("invalid pid '%s'", pid);

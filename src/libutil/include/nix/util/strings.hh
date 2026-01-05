@@ -5,8 +5,12 @@
 #include <list>
 #include <optional>
 #include <set>
+#include <cstddef>
+#include <concepts>
+#include <iterator>
 #include <string_view>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
@@ -30,6 +34,121 @@ C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 extern template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
 extern template StringSet tokenizeString(std::string_view s, std::string_view separators);
 extern template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
+
+/**
+ * Iterate over "tokens" in `s` separated by any character in `separators`,
+ * without allocating or materializing a container of tokens.
+ *
+ * For `std::string_view` inputs, the returned tokens reference the input string,
+ * so the input must outlive the iteration.
+ *
+ * For convenience and safety with temporaries, there is also an overload that
+ * takes `std::string &&` and returns a range that owns the string storage.
+ */
+struct TokenizeStringView
+{
+    std::string_view s;
+    std::string_view separators;
+
+    struct iterator
+    {
+        using iterator_category = std::input_iterator_tag;
+        using value_type = std::string_view;
+        using difference_type = std::ptrdiff_t;
+
+        std::string_view s;
+        std::string_view separators;
+        size_t pos = std::string_view::npos;
+        size_t end = 0;
+
+        iterator() = default;
+
+        iterator(std::string_view s, std::string_view separators, size_t start)
+            : s(s)
+            , separators(separators)
+        {
+            advance(start);
+        }
+
+        void advance(size_t start)
+        {
+            pos = s.find_first_not_of(separators, start);
+            if (pos == s.npos)
+                return;
+
+            end = s.find_first_of(separators, pos + 1);
+            if (end == s.npos)
+                end = s.size();
+        }
+
+        std::string_view operator*() const
+        {
+            return s.substr(pos, end - pos);
+        }
+
+        iterator & operator++()
+        {
+            if (pos != s.npos)
+                advance(end);
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+
+        friend bool operator==(const iterator & it, std::default_sentinel_t)
+        {
+            return it.pos == it.s.npos;
+        }
+
+        friend bool operator!=(const iterator & it, std::default_sentinel_t s)
+        {
+            return !(it == s);
+        }
+    };
+
+    iterator begin() const
+    {
+        return iterator{s, separators, 0};
+    }
+
+    std::default_sentinel_t end() const
+    {
+        return {};
+    }
+};
+
+static inline TokenizeStringView tokenizeString(std::string_view s, std::string_view separators = " \t\n\r")
+{
+    return TokenizeStringView{s, separators};
+}
+
+struct TokenizeStringOwningView
+{
+    std::string s;
+    std::string_view separators;
+
+    TokenizeStringView::iterator begin() const
+    {
+        return TokenizeStringView::iterator{std::string_view{s}, separators, 0};
+    }
+
+    std::default_sentinel_t end() const
+    {
+        return {};
+    }
+};
+
+template<typename S>
+    requires std::same_as<std::remove_cvref_t<S>, std::string> && std::is_rvalue_reference_v<S &&>
+static inline TokenizeStringOwningView tokenizeString(S && s, std::string_view separators = " \t\n\r")
+{
+    return TokenizeStringOwningView{std::forward<S>(s), separators};
+}
 
 /**
  * Split a string, preserving empty strings between separators, as well as at the start and end.

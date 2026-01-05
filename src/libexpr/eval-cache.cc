@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "nix/util/users.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/store/sqlite.hh"
@@ -6,6 +8,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
 // Need specialization involving `SymbolStr` just in this one module.
+#include "nix/util/strings.hh"
 #include "nix/util/strings-inline.hh"
 
 namespace nix::eval_cache {
@@ -265,7 +268,7 @@ struct AttrDb
         case AttrType::String: {
             NixStringContext context;
             if (!queryAttribute.isNull(3))
-                for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), " "))
+                for (auto s : tokenizeString(queryAttribute.getStr(3), " "))
                     context.insert(NixStringContextElem::parse(s));
             return {{rowId, string_t{queryAttribute.getStr(2), context}}};
         }
@@ -685,7 +688,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs())
         attrs.push_back(attr.name);
-    std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
+    std::ranges::sort(attrs, [&](Symbol a, Symbol b) {
         std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
         return sa < sb;
     });

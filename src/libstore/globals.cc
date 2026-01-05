@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <map>
 #include <mutex>
+#include <ranges>
 #include <thread>
 
 #include <curl/curl.h>
@@ -81,10 +82,14 @@ Settings::Settings()
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
     if (s) {
-        Strings ss;
-        for (auto & p : tokenizeString<Strings>(*s, ":"))
-            ss.push_back("@" + p);
-        builders = concatStringsSep("\n", ss);
+        std::string parsedBuilders;
+        for (auto p : tokenizeString(*s, ":")) {
+            if (!parsedBuilders.empty())
+                parsedBuilders.push_back('\n');
+            parsedBuilders.push_back('@');
+            parsedBuilders.append(p);
+        }
+        builders = std::move(parsedBuilders);
     }
 
 #if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
@@ -125,8 +130,8 @@ void loadConfFile(AbstractConfig & config)
     config.resetOverridden();
 
     auto files = settings.nixUserConfFiles;
-    for (auto file = files.rbegin(); file != files.rend(); file++) {
-        applyConfigFile(*file);
+    for (auto & file : std::ranges::reverse_view(files)) {
+        applyConfigFile(file);
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -220,8 +225,8 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 #ifdef __linux__
     StringSet levels = computeLevels();
-    for (auto iter = levels.begin(); iter != levels.end(); ++iter)
-        extraPlatforms.insert(*iter + "-linux");
+    for (const auto & level : levels)
+        extraPlatforms.insert(level + "-linux");
 #elif defined(__APPLE__)
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing

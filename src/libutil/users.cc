@@ -39,12 +39,10 @@ std::vector<std::filesystem::path> getConfigDirs()
 {
     std::filesystem::path configHome = getConfigDir();
     auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    auto tokens = tokenizeString<std::vector<std::string>>(configDirs, ":");
     std::vector<std::filesystem::path> result;
     result.push_back(configHome);
-    for (auto & token : tokens) {
+    for (auto token : tokenizeString(configDirs, ":"))
         result.push_back(std::filesystem::path{token} / "nix");
-    }
     return result;
 }
 

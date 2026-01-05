@@ -80,10 +80,12 @@ static void canonicalisePathMetaData_(
         if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
             throw SysError("querying extended attributes of '%s'", path);
 
-        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+        auto eaNames = std::string_view{eaBuf.data(), static_cast<size_t>(eaSize)};
+        constexpr std::string_view nul{"\0", 1};
+        for (auto eaName : tokenizeString(eaNames, nul)) {
             if (settings.ignoredAcls.get().count(eaName))
                 continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+            if (lremovexattr(path.c_str(), eaName.data()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
     }
