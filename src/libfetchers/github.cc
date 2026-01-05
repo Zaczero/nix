@@ -11,9 +11,12 @@
 #include "nix/util/tarfile.hh"
 #include "nix/fetchers/git-utils.hh"
 
+#include <algorithm>
+#include <array>
 #include <optional>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <sstream>
 
 namespace nix::fetchers {
 
@@ -24,8 +27,12 @@ struct DownloadUrl
 };
 
 // A github, gitlab, or sourcehut host
-const static std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
-std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
+static bool isValidGitHost(std::string_view host)
+{
+    // FIXME: check
+    // [a-zA-Z0-9.-]*
+    return std::ranges::all_of(host, [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '.' || c == '-'; });
+}
 
 struct GitArchiveInputScheme : InputScheme
 {
@@ -154,7 +161,7 @@ struct GitArchiveInputScheme : InputScheme
         if (ref && !isLegalRefName(*ref))
             throw BadURL("input %s contains an invalid branch/tag name", attrsToJSON(attrs));
 
-        if (auto host = maybeGetStrAttr(attrs, "host"); host && !std::regex_match(*host, hostRegex))
+        if (auto host = maybeGetStrAttr(attrs, "host"); host && !isValidGitHost(*host))
             throw BadURL("input %s contains an invalid instance host", attrsToJSON(attrs));
 
         Input input{};
@@ -607,21 +614,37 @@ struct SourceHutInputScheme : GitArchiveInputScheme
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
             refUri = remoteLine->target;
-        } else {
-            refUri = fmt("refs/(heads|tags)/%s", ref);
         }
-        std::regex refRegex(refUri);
 
         auto downloadFileResult = downloadFile(store, settings, fmt("%s/info/refs", base_url), "source", headers);
         auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
         std::istringstream is(contents);
 
+        std::array<std::string, 2> wantedRefs;
+        size_t wantedRefsSize = 0;
+
+        if (ref == "HEAD") {
+            wantedRefs[wantedRefsSize++] = refUri;
+        } else if (ref.starts_with("refs/")) {
+            wantedRefs[wantedRefsSize++] = ref;
+        } else {
+            wantedRefs[wantedRefsSize++] = fmt("refs/heads/%s", ref);
+            wantedRefs[wantedRefsSize++] = fmt("refs/tags/%s", ref);
+        }
+
         std::string line;
         std::optional<std::string> id;
         while (!id && getline(is, line)) {
             auto parsedLine = git::parseLsRemoteLine(line);
-            if (parsedLine && parsedLine->reference && std::regex_match(*parsedLine->reference, refRegex))
-                id = parsedLine->target;
+            if (!parsedLine || !parsedLine->reference)
+                continue;
+
+            for (size_t i = 0; i < wantedRefsSize; ++i) {
+                if (*parsedLine->reference == wantedRefs[i]) {
+                    id = parsedLine->target;
+                    break;
+                }
+            }
         }
 
         if (!id)
