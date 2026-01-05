@@ -7,6 +7,7 @@
 #include "nix/util/file-system.hh"
 
 #include <boost/url.hpp>
+#include <boost/regex.hpp>
 
 namespace nix {
 
@@ -414,10 +415,11 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!url.starts_with("/") && std::regex_match(url, scpRegex))
-        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!url.starts_with("file:") && !url.starts_with("git+file:") && url.find("://") == std::string::npos)
+    static const auto scpRegex = boost::regex("([^/]*)@(.*):(.*)", boost::regex_constants::optimize);
+
+    if (!url.starts_with("/") && boost::regex_match(url, scpRegex))
+        url = boost::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    if (!url.starts_with("file:") && !url.starts_with("git+file:") && !url.contains("://"))
         return ParsedURL{
             .scheme = "file",
             .authority = ParsedURL::Authority{},
@@ -435,9 +437,9 @@ ParsedURL fixGitURL(std::string url)
 bool isValidSchemeName(std::string_view s)
 {
     const static std::string schemeNameRegex = "(?:[a-z][a-z0-9+.-]*)";
-    static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
+    static const auto regex = boost::regex(schemeNameRegex, boost::regex_constants::optimize);
 
-    return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
+    return boost::regex_match(s.begin(), s.end(), regex);
 }
 
 std::ostream & operator<<(std::ostream & os, const VerbatimURL & url)
