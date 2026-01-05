@@ -13,8 +13,9 @@
 #include "self-exe.hh"
 #include "man-pages.hh"
 
+#include <algorithm>
 #include <fcntl.h>
-#include <regex>
+#include <optional>
 #include <pwd.h>
 #include <string_view>
 
@@ -25,6 +26,37 @@ typedef StringMap Channels;
 static Channels channels;
 static std::filesystem::path channelsList;
 
+static bool isCommentLine(std::string_view line)
+{
+    // ^\\s*\\#
+    line = ltrimView(line, " \t\n\r\f\v");
+    return !line.empty() && line.front() == '#';
+}
+
+static bool isValidChannelUrl(std::string_view url)
+{
+    // ^(file|http|https)://
+    return url.starts_with("file://") || url.starts_with("http://") || url.starts_with("https://");
+}
+
+static bool isValidChannelName(std::string_view name)
+{
+    // ^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$
+    auto isStart = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_'; };
+    auto isContinue = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_' || c == '.' || c == '-'; };
+    return !name.empty() && isStart(name.front()) && std::all_of(std::next(name.begin()), name.end(), isContinue);
+}
+
+static std::optional<std::string_view> versionSuffixFromUrlBase(std::string_view urlBase)
+{
+    // (-\\d.*)$
+    for (size_t i = 0; i + 1 < urlBase.size(); ++i) {
+        if (urlBase[i] == '-' && isAsciiDigit(urlBase[i + 1]))
+            return urlBase.substr(i);
+    }
+    return std::nullopt;
+}
+
 // Reads the list of channels.
 static void readChannels()
 {
@@ -32,13 +64,20 @@ static void readChannels()
         return;
     auto channelsFile = readFile(channelsList);
 
-    for (const auto & line : tokenizeString<std::vector<std::string>>(channelsFile, "\n")) {
-        chomp(line);
-        if (std::regex_search(line, std::regex("^\\s*\\#")))
+    for (auto line : tokenizeString(channelsFile, "\n")) {
+        auto lineView = rtrimView(line);
+        if (lineView.empty() || isCommentLine(lineView))
             continue;
-        auto split = tokenizeString<std::vector<std::string>>(line, " ");
-        auto url = std::regex_replace(split[0], std::regex("/*$"), "");
-        auto name = split.size() > 1 ? split[1] : std::string(baseNameOf(url));
+
+        auto split = tokenizeString(lineView);
+        auto it = split.begin();
+        auto end = split.end();
+        if (it == end)
+            continue;
+
+        auto url = std::string(*it++);
+        stripTrailing(url, '/');
+        auto name = it != end ? std::string(*it) : std::string(baseNameOf(url));
         channels[name] = url;
     }
 }
@@ -56,9 +95,9 @@ static void writeChannels()
 // Adds a channel.
 static void addChannel(const std::string & url, const std::string & name)
 {
-    if (!regex_search(url, std::regex("^(file|http|https)://")))
+    if (!isValidChannelUrl(url))
         throw Error("invalid channel URL '%1%'", url);
-    if (!regex_search(name, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
+    if (!isValidChannelName(name))
         throw Error("invalid channel identifier '%1%'", name);
     readChannels();
     channels[name] = url;
@@ -104,10 +143,9 @@ static void update(const StringSet & channelNames)
         // attribute (so that "nix-env -q" on the channels profile
         // shows something useful).
         auto cname = name;
-        std::smatch match;
         auto urlBase = std::string(baseNameOf(url));
-        if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
-            cname = cname + match.str(1);
+        if (auto suffix = versionSuffixFromUrlBase(urlBase))
+            cname = cname + std::string{*suffix};
 
         std::string extraAttrs;
 
@@ -127,7 +165,9 @@ static void update(const StringSet & channelNames)
             url = result.effectiveUrl;
 
             bool unpacked = false;
-            if (std::regex_search(std::string{result.storePath.to_string()}, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
+            auto storePathStr = std::string{result.storePath.to_string()};
+            if (storePathStr.ends_with(".tar.gz") || storePathStr.ends_with(".tar.bz2")
+                || storePathStr.ends_with(".tar.xz")) {
                 runProgram(
                     getNixBin("nix-build").string(),
                     false,
