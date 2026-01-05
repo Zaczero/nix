@@ -1,5 +1,6 @@
 #include "nix/util/mounted-source-accessor.hh"
 
+#include <algorithm>
 #include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
@@ -63,7 +64,7 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         std::vector<std::string> subpath;
         while (true) {
             if (auto mount = getMount(path)) {
-                std::reverse(subpath.begin(), subpath.end());
+                std::ranges::reverse(subpath);
                 return {ref(mount), CanonPath(subpath)};
             }
 

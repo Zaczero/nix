@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <numeric>
+#include <ranges>
 
 #include "nix/util/base-n.hh"
 #include "nix/util/error.hh"
@@ -37,7 +38,7 @@ TEST(base64Encode, encodeAndDecode)
 TEST(base64Encode, encodeAndDecodeNonPrintable)
 {
     char s[256];
-    std::iota(std::rbegin(s), std::rend(s), 0);
+    std::ranges::iota(std::ranges::reverse_view(s), 0);
 
     auto encoded = base64::encode(std::as_bytes(std::span<const char>{std::string_view{s}}));
     auto decoded = base64::decode(encoded);

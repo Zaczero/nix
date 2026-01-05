@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <nlohmann/json.hpp>
 #include <assert.h>
@@ -101,11 +102,11 @@ doFind(const ref<Node> & root, const InputAttrPath & path, std::vector<InputAttr
 {
     auto pos = root;
 
-    auto found = std::find(visited.cbegin(), visited.cend(), path);
+    auto found = std::ranges::find(visited, path);
 
     if (found != visited.end()) {
         std::vector<std::string> cycle;
-        std::transform(found, visited.cend(), std::back_inserter(cycle), printInputAttrPath);
+        std::transform(found, visited.end(), std::back_inserter(cycle), printInputAttrPath);
         cycle.push_back(printInputAttrPath(path));
         throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
     }

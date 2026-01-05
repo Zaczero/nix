@@ -407,15 +407,14 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
             [&](const OutputsSpec::Names & names) { return static_cast<StringSet>(names); },
         },
         bfd.outputs.raw);
-    for (auto iter = outputMap.begin(); iter != outputMap.end();) {
-        auto & outputName = iter->first;
+    std::erase_if(outputMap, [&](const auto & kv) {
+        const auto & outputName = kv.first;
         if (bfd.outputs.contains(outputName)) {
             outputsLeft.erase(outputName);
-            ++iter;
-        } else {
-            iter = outputMap.erase(iter);
+            return false;
         }
-    }
+        return true;
+    });
     if (!outputsLeft.empty())
         throw Error(
             "derivation '%s' does not have an outputs %s",

@@ -2,6 +2,7 @@
 #include <rapidcheck/gtest.h>
 #include "nix/util/sort.hh"
 
+#include <algorithm>
 #include <vector>
 #include <list>
 #include <algorithm>
@@ -27,7 +28,7 @@ TEST_F(MonotonicSubranges, basic)
 {
     ASSERT_EQ(strictlyDecreasingPrefix(basic_.begin(), basic_.end()), basic_.begin() + 4);
     ASSERT_EQ(strictlyDecreasingSuffix(basic_.begin(), basic_.end()), basic_.begin() + 12);
-    std::reverse(basic_.begin(), basic_.end());
+    std::ranges::reverse(basic_);
     ASSERT_EQ(weaklyIncreasingPrefix(basic_.begin(), basic_.end()), basic_.begin() + 5);
     ASSERT_EQ(weaklyIncreasingSuffix(basic_.begin(), basic_.end()), basic_.begin() + 11);
 }
@@ -112,7 +113,7 @@ struct RandomPeekSort : public ::testing::TestWithParam<
         const auto & [maxSize, min, max, iterations] = GetParam();
         std::size_t dataSize = std::uniform_int_distribution<std::size_t>(0, maxSize)(urng_);
         data_.resize(dataSize);
-        std::generate(data_.begin(), data_.end(), [&]() { return distribution_(urng_); });
+        std::ranges::generate(data_, [&]() { return distribution_(urng_); });
     }
 };
 
@@ -123,10 +124,10 @@ TEST_P(RandomPeekSort, defaultComparator)
     for (std::size_t i = 0; i < iterations; ++i) {
         regenerate();
         peeksort(data_.begin(), data_.end());
-        ASSERT_TRUE(std::is_sorted(data_.begin(), data_.end()));
+        ASSERT_TRUE(std::ranges::is_sorted(data_));
         /* Sorting is idempotent */
         peeksort(data_.begin(), data_.end());
-        ASSERT_TRUE(std::is_sorted(data_.begin(), data_.end()));
+        ASSERT_TRUE(std::ranges::is_sorted(data_));
     }
 }
 
@@ -137,10 +138,10 @@ TEST_P(RandomPeekSort, greater)
     for (std::size_t i = 0; i < iterations; ++i) {
         regenerate();
         peeksort(data_.begin(), data_.end(), std::greater<int>{});
-        ASSERT_TRUE(std::is_sorted(data_.begin(), data_.end(), std::greater<int>{}));
+        ASSERT_TRUE(std::ranges::is_sorted(data_, std::greater<int>{}));
         /* Sorting is idempotent */
         peeksort(data_.begin(), data_.end(), std::greater<int>{});
-        ASSERT_TRUE(std::is_sorted(data_.begin(), data_.end(), std::greater<int>{}));
+        ASSERT_TRUE(std::ranges::is_sorted(data_, std::greater<int>{}));
     }
 }
 
@@ -162,8 +163,8 @@ TEST_P(RandomPeekSort, brokenComparator)
         /* Check that the output is just a reordering of the input. This is the
            contract of the implementation in regard to comparators that don't
            define a strict weak order. */
-        std::sort(data_.begin(), data_.end());
-        std::sort(originalData.begin(), originalData.end());
+        std::ranges::sort(data_);
+        std::ranges::sort(originalData);
         ASSERT_EQ(originalData, data_);
     }
 }
@@ -178,17 +179,16 @@ TEST_P(RandomPeekSort, stability)
 
         /* Assign sequential ids to objects. After the sort ids for equivalent
            elements should be in ascending order. */
-        std::transform(
-            data_.begin(), data_.end(), std::back_inserter(pairs), [id = std::size_t{0}](auto && val) mutable {
-                return std::pair{val, ++id};
-            });
+        std::ranges::transform(data_, std::back_inserter(pairs), [id = std::size_t{0}](auto && val) mutable {
+            return std::pair{val, ++id};
+        });
 
         auto comp = [&]([[maybe_unused]] const auto & lhs, [[maybe_unused]] const auto & rhs) -> bool {
             return lhs.first > rhs.first;
         };
 
         peeksort(pairs.begin(), pairs.end(), comp);
-        ASSERT_TRUE(std::is_sorted(pairs.begin(), pairs.end(), comp));
+        ASSERT_TRUE(std::ranges::is_sorted(pairs, comp));
 
         for (auto begin = pairs.begin(), end = pairs.end(); begin < end; ++begin) {
             auto key = begin->first;
@@ -250,7 +250,7 @@ RC_GTEST_PROP(SortProperty, peeksortStability, (std::vector<std::pair<char, char
 {
     auto comp = [](auto lhs, auto rhs) { return lhs.first < rhs.first; };
     auto copy = vec;
-    std::stable_sort(copy.begin(), copy.end(), comp);
+    std::ranges::stable_sort(copy, comp);
     peeksort(vec.begin(), vec.end(), comp);
     RC_ASSERT(copy == vec);
 }

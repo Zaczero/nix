@@ -59,7 +59,7 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
         else
             printMsg(lvl, "these %d derivations will be built:", missing.willBuild.size());
         auto sorted = store->topoSortPaths(missing.willBuild);
-        reverse(sorted.begin(), sorted.end());
+        std::ranges::reverse(sorted);
         for (auto & i : sorted)
             printMsg(lvl, "  %s", store->printStorePath(i));
     }
@@ -80,16 +80,13 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
                 renderSize(missing.narSize));
         }
         std::vector<const StorePath *> willSubstituteSorted = {};
-        std::for_each(missing.willSubstitute.begin(), missing.willSubstitute.end(), [&](const StorePath & p) {
-            willSubstituteSorted.push_back(&p);
+        std::ranges::for_each(missing.willSubstitute, [&](const StorePath & p) { willSubstituteSorted.push_back(&p); });
+        std::ranges::sort(willSubstituteSorted, [](const StorePath * lhs, const StorePath * rhs) {
+            if (lhs->name() == rhs->name())
+                return lhs->to_string() < rhs->to_string();
+            else
+                return lhs->name() < rhs->name();
         });
-        std::sort(
-            willSubstituteSorted.begin(), willSubstituteSorted.end(), [](const StorePath * lhs, const StorePath * rhs) {
-                if (lhs->name() == rhs->name())
-                    return lhs->to_string() < rhs->to_string();
-                else
-                    return lhs->name() < rhs->name();
-            });
         for (auto p : willSubstituteSorted)
             printMsg(lvl, "  %s", store->printStorePath(*p));
     }

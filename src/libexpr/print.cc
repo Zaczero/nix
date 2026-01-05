@@ -1,7 +1,10 @@
+#include <algorithm>
 #include <limits>
+#include <algorithm>
 #include <sstream>
 
 #include "nix/expr/print.hh"
+#include "nix/util/ascii.hh"
 #include "nix/util/ansicolor.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
@@ -94,17 +97,11 @@ std::ostream & printIdentifier(std::ostream & str, std::string_view s)
     else if (isReservedKeyword(s))
         str << '"' << s << '"';
     else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
+        auto pred = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_' || c == '\'' || c == '-'; };
+        if (!std::ranges::all_of(s, pred)) {
             printLiteralString(str, s);
             return str;
         }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '\''
-                  || c == '-')) {
-                printLiteralString(str, s);
-                return str;
-            }
         str << s;
     }
     return str;
@@ -116,14 +113,9 @@ static bool isVarName(std::string_view s)
         return false;
     if (isReservedKeyword(s))
         return false;
-    char c = s[0];
-    if ((c >= '0' && c <= '9') || c == '-' || c == '\'')
-        return false;
-    for (auto & i : s)
-        if (!((i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9') || i == '_' || i == '-'
-              || i == '\''))
-            return false;
-    return true;
+    auto isStart = [](char c) { return !(isAsciiDigit(c) || c == '-' || c == '\''); };
+    auto isContinue = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_' || c == '-' || c == '\''; };
+    return isStart(s.front()) && std::ranges::all_of(s, isContinue);
 }
 
 std::ostream & printAttributeName(std::ostream & str, std::string_view name)
@@ -346,9 +338,9 @@ private:
                 sorted.emplace_back(std::pair(state.symbols[i.name], i.value));
 
             if (options.maxAttrs == std::numeric_limits<size_t>::max())
-                std::sort(sorted.begin(), sorted.end());
+                std::ranges::sort(sorted);
             else
-                std::sort(sorted.begin(), sorted.end(), ImportantFirstAttrNameCmp());
+                std::ranges::sort(sorted, ImportantFirstAttrNameCmp());
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 

@@ -6,6 +6,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
@@ -85,9 +86,7 @@ void Registry::add(const Input & from, const Input & to, const Attrs & extraAttr
 
 void Registry::remove(const Input & input)
 {
-    entries.erase(
-        std::remove_if(entries.begin(), entries.end(), [&](const Entry & entry) { return entry.from == input; }),
-        entries.end());
+    std::erase_if(entries, [&](const Entry & entry) { return entry.from == input; });
 }
 
 static std::filesystem::path getSystemRegistryPath()

@@ -18,6 +18,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/sort.hh"
 
+#include <algorithm>
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -3034,7 +3035,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
-    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
+    std::ranges::sort(list, [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
 }
@@ -3061,7 +3062,7 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value ** args, 
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = (Value *) &i;
 
-    std::sort(list.begin(), list.end(), [&](Value * v1, Value * v2) {
+    std::ranges::sort(list, [&](Value * v1, Value * v2) {
         std::string_view s1 = state.symbols[((Attr *) v1)->name], s2 = state.symbols[((Attr *) v2)->name];
         return s1 < s2;
     });

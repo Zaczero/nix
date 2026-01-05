@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <regex>
 
 #include <exception> // Needed by rapidcheck on Darwin
@@ -17,7 +18,7 @@ Gen<Hash> Arbitrary<Hash>::arbitrary()
         [](const std::vector<uint8_t> & v) {
             Hash hash(HashAlgorithm::SHA1);
             assert(v.size() == hash.hashSize);
-            std::copy(v.begin(), v.end(), hash.hash);
+            std::ranges::copy(v, hash.hash);
             return hash;
         },
         gen::container<std::vector<uint8_t>>(prototype.hashSize, gen::arbitrary<uint8_t>()));

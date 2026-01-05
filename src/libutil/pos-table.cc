@@ -42,7 +42,7 @@ Pos PosTable::operator[](PosIdx p) const
     assert(linesForInput);
 
     // as above: the first line starts at byte 0 and is always present
-    auto lineStartOffset = std::prev(std::upper_bound(linesForInput->begin(), linesForInput->end(), offset));
+    auto lineStartOffset = std::prev(std::ranges::upper_bound(*linesForInput, offset));
     result.line = 1 + (lineStartOffset - linesForInput->begin());
     result.column = 1 + (offset - *lineStartOffset);
     return result;

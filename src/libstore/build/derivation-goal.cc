@@ -284,13 +284,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             /* Otherwise the builder will give us info for out output, but
                also for other outputs. Filter down to just our output so as
                not to leak info on unrelated things. */
-            for (auto it = success.builtOutputs.begin(); it != success.builtOutputs.end();) {
-                if (it->first != wantedOutput) {
-                    it = success.builtOutputs.erase(it);
-                } else {
-                    ++it;
-                }
-            }
+            std::erase_if(success.builtOutputs, [&](const auto & kv) { return kv.first != wantedOutput; });
 
             /* If the wanted output is not in builtOutputs (e.g., because it
                was already valid and therefore not re-registered), we need to

@@ -3,8 +3,11 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/path-with-outputs.hh"
+#include "nix/util/ascii.hh"
 
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <regex>
 
 namespace nix {
@@ -373,21 +376,11 @@ static bool isAttrPathComponent(std::string_view symbol)
 {
     if (symbol.empty())
         return false;
-
     /* [A-Za-z_] */
-    unsigned char first = symbol[0];
-    if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_'))
-        return false;
-
+    auto isStart = [](char c) { return isAsciiAlpha(c) || c == '_'; };
     /* [A-Za-z0-9-_+]* */
-    for (unsigned char c : symbol.substr(1)) {
-        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
-            || c == '+')
-            continue;
-        return false;
-    }
-
-    return true;
+    auto isContinue = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '-' || c == '_' || c == '+'; };
+    return isStart(symbol.front()) && std::all_of(std::next(symbol.begin()), symbol.end(), isContinue);
 }
 
 static void getDerivations(

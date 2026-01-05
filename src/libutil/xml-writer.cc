@@ -72,8 +72,7 @@ void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 {
     for (auto & i : attrs) {
         output << " " << i.first << "=\"";
-        for (size_t j = 0; j < i.second.size(); ++j) {
-            char c = i.second[j];
+        for (auto c : i.second) {
             if (c == '"')
                 output << "&quot;";
             else if (c == '<')

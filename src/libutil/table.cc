@@ -26,7 +26,7 @@ void printTable(std::ostream & out, Table & table)
         size_t column = 0;
         for (auto j = i.begin(); j != i.end(); ++j, ++column) {
             std::string s = *j;
-            replace(s.begin(), s.end(), '\n', ' ');
+            std::ranges::replace(s, '\n', ' ');
             out << s;
             if (column < nrColumns - 1)
                 out << std::string(widths[column] - s.size() + 2, ' ');

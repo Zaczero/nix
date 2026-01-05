@@ -111,8 +111,8 @@ TEST_F(nix_api_store_test, nix_store_path_hash)
 
     // The hash should be non-zero
     bool allZero = true;
-    for (size_t i = 0; i < sizeof(hash.bytes); i++) {
-        if (hash.bytes[i] != 0) {
+    for (auto byte : hash.bytes) {
+        if (byte != 0) {
             allZero = false;
             break;
         }

@@ -19,6 +19,7 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
 
+#include <algorithm>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
@@ -965,7 +966,7 @@ std::map<StorePath, StorePath> copyPaths(
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
     auto sortedMissing = srcStore.topoSortPaths(missing);
-    std::reverse(sortedMissing.begin(), sortedMissing.end());
+    std::ranges::reverse(sortedMissing);
 
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)

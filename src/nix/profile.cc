@@ -13,9 +13,11 @@
 #include "nix/util/url.hh"
 #include "nix/flake/url-name.hh"
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <iomanip>
+#include <ranges>
 
 #include "nix/util/strings.hh"
 
@@ -603,11 +605,9 @@ public:
             throw UsageError("No packages specified.");
         }
 
-        if (std::find_if(
-                _matchers.begin(),
-                _matchers.end(),
-                [](const ref<Matcher> & m) { return m.dynamic_pointer_cast<AllMatcher>(); })
-                != _matchers.end()
+        if (std::ranges::any_of(
+                _matchers,
+                [](const ref<Matcher> & m) { return static_cast<bool>(m.dynamic_pointer_cast<AllMatcher>()); })
             && _matchers.size() > 1) {
             throw UsageError("--all cannot be used with package names or regular expressions.");
         }

@@ -4,6 +4,7 @@
 #include "nix/util/util.hh"
 #include "nix/expr/print.hh"
 
+#include <algorithm>
 #include <cstdlib>
 #include <sstream>
 
@@ -78,7 +79,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     std::vector<Attr> sorted;
     for (auto & i : *attrs)
         sorted.push_back(&i);
-    std::sort(sorted.begin(), sorted.end(), [&](Attr a, Attr b) {
+    std::ranges::sort(sorted, [&](Attr a, Attr b) {
         std::string_view sa = symbols[a->first], sb = symbols[b->first];
         return sa < sb;
     });

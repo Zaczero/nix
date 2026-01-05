@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "nix/store/local-store.hh"
 #include "nix/store/machines.hh"
 #include "nix/store/store-open.hh"
@@ -149,12 +151,7 @@ template<typename K, typename G, typename Inner>
 static bool removeGoal(std::shared_ptr<G> goal, std::map<K, Inner> & goalMap)
 {
     /* !!! inefficient */
-    for (auto i = goalMap.begin(); i != goalMap.end();) {
-        if (!removeGoal(goal, i->second))
-            i = goalMap.erase(i);
-        else
-            ++i;
-    }
+    std::erase_if(goalMap, [&](auto & entry) { return !removeGoal(goal, entry.second); });
     return !goalMap.empty();
 }
 
@@ -246,7 +243,7 @@ void Worker::childStarted(
 
 void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
-    auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
+    auto i = std::ranges::find_if(children, [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
 
