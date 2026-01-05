@@ -1,11 +1,20 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "nix/util/ascii.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/store/path.hh"
 
+#include <algorithm>
+
 namespace nix::fetchers {
 
-std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
+static bool isValidFlakeId(std::string_view id)
+{
+    // [a-zA-Z][a-zA-Z0-9_-]*
+    return !id.empty() && isAsciiAlpha(id.front()) && std::all_of(std::next(id.begin()), id.end(), [](char c) {
+        return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_' || c == '-';
+    });
+}
 
 struct IndirectInputScheme : InputScheme
 {
@@ -39,7 +48,7 @@ struct IndirectInputScheme : InputScheme
             throw BadURL("GitHub URL '%s' is invalid", url);
 
         std::string id = path[0];
-        if (!std::regex_match(id, flakeRegex))
+        if (!isValidFlakeId(id))
             throw BadURL("'%s' is not a valid flake ID", id);
 
         // FIXME: forbid query params?
@@ -92,7 +101,7 @@ struct IndirectInputScheme : InputScheme
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
     {
         auto id = getStrAttr(attrs, "id");
-        if (!std::regex_match(id, flakeRegex))
+        if (!isValidFlakeId(id))
             throw BadURL("'%s' is not a valid flake ID", id);
 
         Input input{};
