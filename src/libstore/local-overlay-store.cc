@@ -1,10 +1,14 @@
-#include <regex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
+#include "nix/util/strings.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
@@ -46,24 +50,41 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , lowerStore(openStore(percentDecode(config->lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
 {
     if (config->checkMount.get()) {
-        std::smatch match;
         std::string mountInfo;
+        std::string mountOptions;
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
-        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir.get() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
-        // Loop until the last match, which will be the current state of the mount point.
-        while (std::regex_search(mounts, match, regex)) {
-            mountInfo = match.str();
-            mounts = match.suffix();
+        // Pick the last matching entry, which will be the current state of the mount point.
+        for (const auto & line : tokenizeString<std::vector<std::string>>(mounts, "\n")) {
+            auto fields = tokenizeString<std::vector<std::string>>(line, " ");
+            if (fields.size() < 4)
+                continue;
+            if (fields[0] != "overlay")
+                continue;
+            if (fields[1] != config->realStoreDir.get())
+                continue;
+            mountInfo = line;
+            mountOptions = fields[3];
         }
 
-        auto checkOption = [&](std::string option, std::string value) {
-            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
+        auto mountOptionsTokens = tokenizeString<std::vector<std::string>>(mountOptions, ",");
+
+        auto getOption = [&](std::string_view key) -> std::optional<std::string_view> {
+            for (auto option : tokenizeString(mountOptions, ",")) {
+                if (option.starts_with(key) && option.size() >= key.size() + 1 && option[key.size()] == '=')
+                    return option.substr(key.size() + 1);
+            }
+            return std::nullopt;
+        };
+
+        auto checkOption = [&](std::string_view key, std::string_view value) {
+            auto found = getOption(key);
+            return found && *found == value;
         };
 
         auto expectedLowerDir = lowerStore->config.realStoreDir.get();
-        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer)) {
+        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer.get())) {
             debug("expected lowerdir: %s", expectedLowerDir);
             debug("expected upperdir: %s", config->upperLayer);
             debug("actual mount: %s", mountInfo);
