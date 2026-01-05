@@ -2,9 +2,12 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
+#include "nix/util/ascii.hh"
 
 #include <nlohmann/json.hpp>
-#include <regex>
+
+#include <algorithm>
+#include <iterator>
 
 namespace nix {
 
@@ -44,7 +47,13 @@ void StructuredAttrs::checkKeyNotInUse(const StringPairs & env)
             "Cannot have an environment variable named '__json'. This key is reserved for encoding structured attrs");
 }
 
-static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
+static bool isShVarName(std::string_view s)
+{
+    // [A-Za-z_][A-Za-z0-9_]*
+    auto isStart = [](char c) { return c == '_' || isAsciiAlpha(c); };
+    auto isContinue = [](char c) { return c == '_' || isAsciiAlpha(c) || isAsciiDigit(c); };
+    return !s.empty() && isStart(s.front()) && std::all_of(std::next(s.begin()), s.end(), isContinue);
+}
 
 /**
  * Write a JSON representation of store object metadata, such as the
@@ -147,7 +156,7 @@ std::string StructuredAttrs::writeShell(const nlohmann::json::object_t & json)
 
     for (auto & [key, value] : json) {
 
-        if (!std::regex_match(key, shVarName))
+        if (!isShVarName(key))
             continue;
 
         auto s = handleSimpleType(value);
