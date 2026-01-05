@@ -5,10 +5,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 
+#include <algorithm>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <regex>
 #include <thread>
 
 #include <dirent.h>
@@ -37,14 +38,28 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile)
 {
     StringMap cgroups;
 
-    for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cgroupFile), "\n")) {
-        static std::regex regex("([0-9]+):([^:]*):(.*)");
-        std::smatch match;
-        if (!std::regex_match(line, match, regex))
+    for (auto line : tokenizeString(readFile(cgroupFile), "\n")) {
+        auto lineView = std::string_view(line);
+
+        // ([0-9]+):([^:]*):(.*)
+        auto firstSplit = splitOnce(lineView, ':');
+        if (!firstSplit)
             throw Error("invalid line '%s' in '%s'", line, cgroupFile);
 
-        std::string name = std::string(match[2]).starts_with("name=") ? std::string(match[2], 5) : match[2];
-        cgroups.insert_or_assign(name, match[3]);
+        auto secondSplit = splitOnce(firstSplit->second, ':');
+        if (!secondSplit)
+            throw Error("invalid line '%s' in '%s'", line, cgroupFile);
+
+        auto hierarchyId = firstSplit->first;
+        auto controller = secondSplit->first;
+        auto path = secondSplit->second;
+
+        if (hierarchyId.empty() || !std::ranges::all_of(hierarchyId, [](char c) { return isAsciiDigit(c); }))
+            throw Error("invalid line '%s' in '%s'", line, cgroupFile);
+
+        std::string name =
+            controller.starts_with("name=") ? std::string(controller.substr(5)) : std::string(controller);
+        cgroups.insert_or_assign(std::move(name), std::string(path));
     }
 
     return cgroups;
