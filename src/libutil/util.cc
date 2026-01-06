@@ -60,11 +60,6 @@ std::string rtrim(std::string_view s, std::string_view whitespace)
     return std::string(rtrimView(s, whitespace));
 }
 
-std::string chomp(std::string_view s)
-{
-    return rtrim(s);
-}
-
 std::string ltrim(std::string_view s, std::string_view whitespace)
 {
     return std::string(ltrimView(s, whitespace));

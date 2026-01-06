@@ -72,11 +72,6 @@ inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char 
 std::string rtrim(std::string_view s, std::string_view whitespace = " \n\r\t");
 
 /**
- * Deprecated alias for `rtrim`.
- */
-std::string chomp(std::string_view s);
-
-/**
  * Remove leading whitespace from a string, returning a new string.
  */
 std::string ltrim(std::string_view s, std::string_view whitespace = " \n\r\t");
