@@ -3,6 +3,8 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
+#include <optional>
+#include <ranges>
 #include <regex>
 #include <sstream>
 #include <vector>
@@ -30,19 +32,27 @@
 #include "nix/cmd/network-proxy.hh"
 #include "nix/cmd/compatibility-settings.hh"
 #include "man-pages.hh"
+#include "nix/util/util.hh"
 
 using namespace nix;
 using namespace std::string_literals;
 
 extern char ** environ __attribute__((weak));
 
+static constexpr std::string_view shebangWhitespace = " \t\n\r\f\v";
+
+static constexpr bool isShebangWhitespace(char c)
+{
+    return shebangWhitespace.contains(c);
+}
+
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
  */
 static std::vector<std::string> shellwords(std::string_view s)
 {
-    std::regex whitespace("^\\s+");
-    auto begin = s.cbegin();
+    auto begin = s.begin();
+    auto end = s.end();
     std::vector<std::string> res;
     std::string cur;
 
@@ -50,14 +60,15 @@ static std::vector<std::string> shellwords(std::string_view s)
 
     state st = sBegin;
     auto it = begin;
-    for (; it != s.cend(); ++it) {
+    for (; it != end; ++it) {
         if (st == sBegin) {
-            std::cmatch match;
-            if (regex_search(it, s.cend(), match, whitespace)) {
+            if (isShebangWhitespace(*it)) {
                 cur.append(begin, it);
                 res.push_back(cur);
-                it = match[0].second;
-                if (it == s.cend())
+                do {
+                    ++it;
+                } while (it != end && isShebangWhitespace(*it));
+                if (it == end)
                     return res;
                 begin = it;
                 cur.clear();
@@ -94,6 +105,22 @@ static std::vector<std::string> shellwords(std::string_view s)
     return res;
 }
 
+static std::optional<std::string_view> nixShellArgsFromShebangLine(std::string_view line)
+{
+    constexpr std::string_view nixShell = "nix-shell";
+
+    // ^#!\\s*nix-shell\\s+(.*)$
+    if (!stripPrefix(line, "#!"))
+        return std::nullopt;
+    line = ltrimView(line, shebangWhitespace);
+    if (!stripPrefix(line, nixShell))
+        return std::nullopt;
+    if (line.empty() || !isShebangWhitespace(line[0]))
+        return std::nullopt;
+    line = ltrimView(line, shebangWhitespace);
+    return line;
+}
+
 /**
  * Like `resolveExprPath`, but prefers `shell.nix` instead of `default.nix`,
  * and if `path` was a directory, it checks eagerly whether `shell.nix` or
@@ -124,7 +151,7 @@ static SourcePath resolveShellExprPath(SourcePath path)
 static void main_nix_build(int argc, char ** argv)
 {
     auto dryRun = false;
-    auto isNixShell = std::regex_search(argv[0], std::regex("nix-shell$"));
+    auto isNixShell = std::string_view{argv[0]}.ends_with("nix-shell");
     auto pure = false;
     auto fromArgs = false;
     auto packages = false;
@@ -179,17 +206,15 @@ static void main_nix_build(int argc, char ** argv)
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
-            if (!lines.empty() && std::regex_search(lines.front(), std::regex("^#!"))) {
-                lines.pop_front();
+            if (!lines.empty() && lines.front().starts_with("#!")) {
                 inShebang = true;
                 for (int i = 2; i < argc; ++i)
                     savedArgs.push_back(argv[i]);
                 args.clear();
-                for (auto line : lines) {
-                    line = rtrim(line);
-                    std::smatch match;
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
-                        for (const auto & word : shellwords({match[1].first, match[1].second}))
+                for (auto & line : lines | std::views::drop(1)) {
+                    auto lineView = rtrimView(line);
+                    if (auto maybeArgs = nixShellArgsFromShebangLine(lineView))
+                        for (const auto & word : shellwords(*maybeArgs))
                             args.push_back(word);
                 }
             }
@@ -269,14 +294,14 @@ static void main_nix_build(int argc, char ** argv)
             // executes it unless it contains the string "perl" or "indir",
             // or (undocumented) argv[0] does not contain "perl". Exploit
             // the latter by doing "exec -a".
-            if (std::regex_search(interpreter, std::regex("perl")))
+            if (interpreter.contains("perl"))
                 execArgs = "-a PERL";
 
             std::ostringstream joined;
             for (const auto & i : savedArgs)
                 joined << escapeShellArgAlways(i) << ' ';
 
-            if (std::regex_search(interpreter, std::regex("ruby"))) {
+            if (interpreter.contains("ruby")) {
                 // Hack for Ruby. Ruby also examines the shebang. It tries to
                 // read the shebang to understand which packages to read from. Since
                 // this is handled via nix-shell -p, we wrap our ruby script execution
